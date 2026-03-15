@@ -2,14 +2,14 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Mobile Arena</title>
+<title>Mobile Shooter</title>
 
 <style>
 body{
 margin:0;
 overflow:hidden;
-background:#1a1a1a;
-touch-action:none; /* 🔒 запрещает двигать экран */
+touch-action:none;
+background:#1e1e1e;
 }
 
 canvas{
@@ -17,38 +17,34 @@ display:block;
 background:#2e8b57;
 }
 
-#shoot,#super{
+#hpBar{
 position:absolute;
-bottom:40px;
-width:85px;
-height:85px;
-border-radius:50%;
-color:white;
-font-weight:bold;
-display:flex;
-align-items:center;
-justify-content:center;
-user-select:none;
+top:15px;
+left:15px;
+width:200px;
+height:20px;
+background:#444;
+}
+
+#hp{
+height:100%;
+width:100%;
+background:lime;
 }
 
 #shoot{
-right:40px;
-background:rgba(255,60,60,0.8);
-}
-
-#super{
-right:140px;
-background:rgba(60,120,255,0.8);
-}
-
-#joystick{
 position:absolute;
-left:40px;
-bottom:40px;
-width:120px;
-height:120px;
-background:rgba(255,255,255,0.1);
+right:40px;
+bottom:50px;
+width:80px;
+height:80px;
 border-radius:50%;
+background:red;
+color:white;
+display:flex;
+align-items:center;
+justify-content:center;
+font-weight:bold;
 }
 </style>
 </head>
@@ -57,9 +53,8 @@ border-radius:50%;
 
 <canvas id="game" width="900" height="500"></canvas>
 
-<div id="joystick"></div>
+<div id="hpBar"><div id="hp"></div></div>
 <div id="shoot">🔥</div>
-<div id="super">⭐</div>
 
 <script>
 
@@ -67,93 +62,70 @@ const canvas=document.getElementById("game")
 const ctx=canvas.getContext("2d")
 
 let player={
-x:200,y:250,speed:3,hp:100
+x:450,
+y:250,
+hp:100
 }
 
-let move={x:0,y:0}
 let bullets=[]
-let enemyBullets=[]
 let enemies=[]
-let superReady=true
+let enemyBullets=[]
+let grenades=[]
+let explosions=[]
 
-let walls=[
-{x:350,y:120,w:60,h:260},
-{x:600,y:220,w:250,h:50}
+let bushes=[
+{x:200,y:150,w:100,h:80},
+{x:600,y:300,w:120,h:90}
 ]
 
-for(let i=0;i<6;i++){
+function spawnEnemy(){
+let types=["red","green","purple"]
+let type=types[Math.floor(Math.random()*3)]
+
 enemies.push({
-x:500+Math.random()*300,
-y:100+Math.random()*300,
-hp:60,
+x:Math.random()*850+25,
+y:Math.random()*450+25,
+type:type,
 cool:0
 })
 }
 
+setInterval(spawnEnemy,2000)
+
+document.addEventListener("touchmove",e=>{
+let t=e.touches[0]
+player.x=t.clientX
+player.y=t.clientY
+})
+
 document.getElementById("shoot").addEventListener("touchstart",shoot)
-document.getElementById("super").addEventListener("touchstart",superAttack)
 
 function shoot(){
 
-for(let i=0;i<3;i++){ // автомат
-
 bullets.push({
 x:player.x,
 y:player.y,
-vx:6,
-vy:(Math.random()-0.5)*2
+vx:8,
+vy:0
 })
 
-}
-
-playSound()
+playSound("shoot")
 
 }
 
-function superAttack(){
+function playSound(type){
 
-if(!superReady) return
+let url=""
 
-for(let i=0;i<20;i++){
+if(type==="shoot")
+url="https://actions.google.com/sounds/v1/weapons/laser_shot.ogg"
 
-bullets.push({
-x:player.x,
-y:player.y,
-vx:Math.cos(i)*7,
-vy:Math.sin(i)*7
-})
+if(type==="explosion")
+url="https://actions.google.com/sounds/v1/explosions/explosion.ogg"
 
-}
-
-superReady=false
-setTimeout(()=>superReady=true,5000)
-
-}
-
-function playSound(){
-
-let audio=new Audio("https://actions.google.com/sounds/v1/weapons/laser_shot.ogg")
+let audio=new Audio(url)
 audio.volume=0.3
 audio.play()
-
-}
-
-function enemyShoot(e){
-
-let dx=player.x-e.x
-let dy=player.y-e.y
-let angle=Math.atan2(dy,dx)
-
-for(let i=-2;i<=2;i++){ // дробовик
-
-enemyBullets.push({
-x:e.x,
-y:e.y,
-vx:Math.cos(angle+i*0.2)*5,
-vy:Math.sin(angle+i*0.2)*5
-})
-
-}
 
 }
 
@@ -166,44 +138,72 @@ let dy=player.y-e.y
 let dist=Math.sqrt(dx*dx+dy*dy)
 
 if(dist>0){
-
-e.x+=dx/dist*0.7
-e.y+=dy/dist*0.7
-
+e.x+=dx/dist*0.8
+e.y+=dy/dist*0.8
 }
 
 e.cool--
+
 if(e.cool<=0){
-enemyShoot(e)
-e.cool=120
+
+if(e.type==="red"){
+shootEnemy(e,4,0.15,6)
+}
+
+if(e.type==="green"){
+grenades.push({x:e.x,y:e.y,vx:(player.x-e.x)/60,vy:(player.y-e.y)/60})
+}
+
+if(e.type==="purple"){
+shootEnemy(e,1,0.05,10)
+}
+
+e.cool=100
+
 }
 
 })
 
 }
 
-function updateBullets(){
+function shootEnemy(e,count,spread,speed){
 
-bullets.forEach(b=>{
-b.x+=b.vx
-b.y+=b.vy
+for(let i=0;i<count;i++){
+
+enemyBullets.push({
+x:e.x,
+y:e.y,
+vx:(Math.random()-0.5)*spread*10,
+vy:(Math.random()-0.5)*spread*10
 })
 
+}
+
+}
+
+function update(){
+
+bullets.forEach(b=>b.x+=b.vx)
 enemyBullets.forEach(b=>{
 b.x+=b.vx
 b.y+=b.vy
 })
 
+grenades.forEach(g=>{
+g.x+=g.vx
+g.y+=g.vy
+})
+
 }
 
-function collision(){
+function collisions(){
 
 bullets.forEach(b=>{
 enemies.forEach(e=>{
 let dx=b.x-e.x
 let dy=b.y-e.y
 if(Math.sqrt(dx*dx+dy*dy)<15){
-e.hp-=20
+e.hp=0
 b.x=-999
 }
 })
@@ -212,30 +212,23 @@ b.x=-999
 enemyBullets.forEach(b=>{
 let dx=b.x-player.x
 let dy=b.y-player.y
-if(Math.sqrt(dx*dx+dy*dy)<15){
+if(Math.sqrt(dx*dx+dy*dy)<12){
 player.hp-=10
 b.x=-999
 }
 })
 
-enemies=enemies.filter(e=>e.hp>0)
-
+grenades.forEach(g=>{
+let dx=g.x-player.x
+let dy=g.y-player.y
+if(Math.sqrt(dx*dx+dy*dy)<20){
+player.hp-=20
+playSound("explosion")
+g.x=-999
 }
-
-function drawMap(){
-
-// текстура
-for(let x=0;x<900;x+=40){
-for(let y=0;y<500;y+=40){
-ctx.strokeStyle="rgba(0,0,0,0.1)"
-ctx.strokeRect(x,y,40,40)
-}
-}
-
-walls.forEach(w=>{
-ctx.fillStyle="#555"
-ctx.fillRect(w.x,w.y,w.w,w.h)
 })
+
+enemies=enemies.filter(e=>e.hp!==0)
 
 }
 
@@ -243,7 +236,11 @@ function draw(){
 
 ctx.clearRect(0,0,900,500)
 
-drawMap()
+// кусты
+ctx.fillStyle="green"
+bushes.forEach(b=>{
+ctx.fillRect(b.x,b.y,b.w,b.h)
+})
 
 // игрок
 ctx.fillStyle="blue"
@@ -251,40 +248,42 @@ ctx.beginPath()
 ctx.arc(player.x,player.y,15,0,Math.PI*2)
 ctx.fill()
 
-// пули
-ctx.fillStyle="yellow"
-bullets.forEach(b=>{
-ctx.fillRect(b.x,b.y,6,3)
-})
-
-ctx.fillStyle="red"
-enemyBullets.forEach(b=>{
-ctx.fillRect(b.x,b.y,5,5)
-})
-
 // враги
-ctx.fillStyle="darkred"
 enemies.forEach(e=>{
+ctx.fillStyle=e.type==="red"?"red":
+e.type==="green"?"lime":"purple"
 ctx.beginPath()
-ctx.arc(e.x,e.y,15,0,Math.PI*2)
+ctx.arc(e.x,e.y,14,0,Math.PI*2)
 ctx.fill()
 })
+
+// пули
+ctx.fillStyle="yellow"
+bullets.forEach(b=>ctx.fillRect(b.x,b.y,6,3))
+
+ctx.fillStyle="orange"
+enemyBullets.forEach(b=>ctx.fillRect(b.x,b.y,5,5))
+
+}
+
+function hpUpdate(){
+
+document.getElementById("hp").style.width=player.hp+"%"
+
+if(player.hp<=0){
+alert("Game Over")
+location.reload()
+}
 
 }
 
 function loop(){
-
-player.x+=move.x
-player.y+=move.y
-
 updateEnemies()
-updateBullets()
-collision()
-
+update()
+collisions()
 draw()
-
+hpUpdate()
 requestAnimationFrame(loop)
-
 }
 
 loop()
