@@ -1,45 +1,44 @@
 using UnityEngine;
 
-public class PlayerController : MonoBehaviour
+public class PlayerManager : MonoBehaviour
 {
-    public float moveSpeed = 8f;
+    [Header("Movement Settings")]
+    public float speed = 8f;
     public float jumpForce = 12f;
+    
+    [Header("Combat Settings")]
+    public Transform attackPoint;
+    public float attackRange = 0.5f;
+    public LayerMask enemyLayers;
+
     private Rigidbody2D rb;
     private bool isGrounded;
 
-    void Start()
-    {
+    void Start() {
         rb = GetComponent<Rigidbody2D>();
     }
 
-    void Update()
-    {
+    void Update() {
         // Движение
-        float moveInput = Input.GetAxis("Horizontal");
-        rb.velocity = new Vector2(moveInput * moveSpeed, rb.velocity.y);
+        float move = Input.GetAxis("Horizontal");
+        rb.velocity = new Vector2(move * speed, rb.velocity.y);
 
         // Прыжок
-        if (Input.GetButtonDown("Jump") && isGrounded)
-        {
+        if (Input.GetButtonDown("Jump") && isGrounded) {
             rb.velocity = new Vector2(rb.velocity.x, jumpForce);
         }
-    }
 
-    // Проверка, стоит ли персонаж на земле
-    private void OnCollisionEnter2D(Collision2D collision)
-    {
-        if (collision.gameObject.CompareTag("Ground"))
-        {
-            isGrounded = true;
+        // Атака
+        if (Input.GetKeyDown(KeyCode.F)) {
+            Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(attackPoint.position, attackRange, enemyLayers);
+            foreach(Collider2D enemy in hitEnemies) {
+                Debug.Log("Враг атакован!");
+                // Здесь логика урона: enemy.gameObject.SetActive(false);
+            }
         }
     }
 
-    private void OnCollisionExit2D(Collision2D collision)
-    {
-        if (collision.gameObject.CompareTag("Ground"))
-        {
-            isGrounded = false;
-        }
-    }
+    void OnCollisionEnter2D(Collision2D col) { if (col.gameObject.tag == "Ground") isGrounded = true; }
+    void OnCollisionExit2D(Collision2D col) { if (col.gameObject.tag == "Ground") isGrounded = false; }
 }
-          
+            
